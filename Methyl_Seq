@@ -1,0 +1,304 @@
+```{r}
+
+#dependencies
+#install.packages( c("data.table","devtools"))
+#if (!require("BiocManager", quietly = TRUE))
+#    install.packages("BiocManager")
+#BiocManager::install(version = "3.15")
+#library(devtools)
+#install_github("al2na/methylKit",build_vignettes=FALSE)
+
+
+
+#sample_1 <- read.table("~/R/8018_methyl/8018-AJ-01_Full_CEGX.CX_report.txt")
+#sample_2 <- read.table("~/R/8018_methyl/8018-AJ-02_Full_CEGX.CX_report.txt")
+#sample_3 <- read.table("~/R/8018_methyl/8018-AJ-03_Full_CEGX.CX_report.txt")
+#sample_4 <- read.table("~/R/8018_methyl/8018-AJ-04_Full_CEGX.CX_report.txt")
+
+
+library(methylKit)
+file.list=list("~/R/8018_methyl/8018-AJ-01_Full_CEGX.CX_report.txt","~/R/8018_methyl/8018-AJ-02_Full_CEGX.CX_report.txt","~/R/8018_methyl/8018-AJ-03_Full_CEGX.CX_report.txt")
+
+
+# read the files to a methylRawList object: myobj
+myobj=methRead(file.list,
+           sample.id=list("8018-AJ-01","8018-AJ-02","8018-AJ-03"),
+           assembly="hg38",
+           treatment=c(0,1,1),
+           pipeline="bismarkCytosineReport",
+           context="CpG",
+           mincov = 10
+            )
+
+
+#descriptive statistics
+getMethylationStats(myobj[[1]],plot=FALSE,both.strands=FALSE)
+#cpg methylation
+getMethylationStats(myobj[[1]],plot=TRUE,both.strands=FALSE)
+#cpg coverage
+getCoverageStats(myobj[[1]],plot=TRUE,both.strands=FALSE)
+
+#descriptive statistics
+getMethylationStats(myobj[[2]],plot=FALSE,both.strands=FALSE)
+#cpg methylation
+getMethylationStats(myobj[[2]],plot=TRUE,both.strands=FALSE)
+#cpg coverage
+getCoverageStats(myobj[[2]],plot=TRUE,both.strands=FALSE)
+
+#descriptive statistics
+getMethylationStats(myobj[[3]],plot=FALSE,both.strands=FALSE)
+#cpg methylation
+getMethylationStats(myobj[[3]],plot=TRUE,both.strands=FALSE)
+#cpg coverage
+getCoverageStats(myobj[[3]],plot=TRUE,both.strands=FALSE)
+
+
+
+
+
+```
+
+
+#Comparative Analysis
+```{r}
+
+#merging samples
+meth=unite(myobj, destrand=FALSE)
+write.table(meth,"~/R/8018_methyl/meth")
+
+
+
+
+#sample correlation
+getCorrelation(meth,plot=TRUE)
+
+
+#clustering samples based on methylation profiles
+clusterSamples(meth, dist="correlation", method="ward", plot=TRUE)
+#hc = clusterSamples(meth, dist="correlation", method="ward", plot=FALSE)
+PCASamples(meth)
+
+
+##Finding differentially methylated bases or regions
+myDiff=calculateDiffMeth(meth)
+write.table(myDiff,"~/R/8018_methyl/myDiff")
+
+#
+# get hyper methylated bases
+myDiff25p.hyper=getMethylDiff(myDiff,difference=25,qvalue=0.5,type="hyper")
+write.table(myDiff25p.hyper,"~/R/8018_methyl/hyper_meth")
+
+# get hypo methylated bases
+myDiff25p.hypo=getMethylDiff(myDiff,difference=25,qvalue=0.5,type="hypo")
+write.table(myDiff25p.hypo,"~/R/8018_methyl/hypo_meth")
+
+# get all differentially methylated bases
+myDiff25p=getMethylDiff(myDiff,difference=25,qvalue=0.5)
+write.table(myDiff25p,"~/R/8018_methyl/all_Diff_meth")
+
+diffMethPerChr(myDiff,plot=TRUE,qvalue.cutoff=0.5, meth.cutoff=25)
+diffMethPerChr(myDiff,plot=FALSE,qvalue.cutoff=0.5, meth.cutoff=25)
+
+
+```
+
+
+#Annotating differentially methylated bases or regions
+```{r}
+#if (!require("BiocManager", quietly = TRUE))
+#    install.packages("BiocManager")
+#BiocManager::install("genomation")
+
+library(genomation)
+#regional analysis using bed file
+gene.obj=readTranscriptFeatures("~/R/8018_methyl/hg38_RefSeq.bed")
+
+annotateWithGeneParts(as(myDiff25p,"GRanges"),gene.obj)
+
+# convert methylDiff object to GRanges and annotate
+diffCpGann=annotateWithFeatureFlank(as(myDiff25p,"GRanges"),
+                                    cpg.obj$CpGi,cpg.obj$shores,
+                         feature.name="CpGi",flank.name="shores")
+
+
+cpg.obj=readFeatureFlank(system.file("cpgi.hg38.bed.txt",
+                                        package = "methylKit"),
+                           feature.flank.name=c("CpGi","shores"))
+
+
+
+
+
+#========================================
+##4
+#Regional Analysis
+promoters=regionCounts(myobj,gene.obj$promoters)
+head(promoters[[3]])
+
+#Convenience functions for annotation objects
+diffAnn=annotateWithGeneParts(as(myDiff25p,"GRanges"),gene.obj)
+head(getAssociationWithTSS(diffAnn))
+getTargetAnnotationStats(diffAnn,percentage=TRUE,precedence=TRUE) # no overlap except the intergenic
+
+plotTargetAnnotation(diffAnn,precedence=TRUE,
+    main="differential methylation annotation")
+
+
+
+
+```
+
+
+#EXTRA CALCULATION
+```{r}
+
+library(dplyr)
+
+count <- read.table("~/R/8018_methyl/meth")
+
+
+ifelse(count$numCs2==count$numCs3,"YES","")
+
+
+
+
+
+```
+
+
+
+
+#NEB
+```{r}
+
+library(methylKit)
+file.list=list("~/R/8018_methyl/8018-AJ-01_Full_NEB.CX_report.txt","~/R/8018_methyl/8018-AJ-02_Full_NEB.CX_report.txt","~/R/8018_methyl/8018-AJ-03_Full_NEB.CX_report.txt")
+
+
+# read the files to a methylRawList object: myobj
+myobj_NEB=methRead(file.list,
+           sample.id=list("8018-AJ-01_NEB","8018-AJ-02_NEB","8018-AJ-03_NEB"),
+           assembly="hg38",
+           treatment=c(0,1,1),
+           pipeline="bismarkCytosineReport",
+           context="CpG",
+           mincov = 10
+            )
+
+
+#descriptive statistics
+getMethylationStats(myobj_NEB[[1]],plot=FALSE,both.strands=FALSE)
+#cpg methylation
+getMethylationStats(myobj_NEB[[1]],plot=TRUE,both.strands=FALSE)
+#cpg coverage
+getCoverageStats(myobj_NEB[[1]],plot=TRUE,both.strands=FALSE)
+
+#descriptive statistics
+getMethylationStats(myobj_NEB[[2]],plot=FALSE,both.strands=FALSE)
+#cpg methylation
+getMethylationStats(myobj_NEB[[2]],plot=TRUE,both.strands=FALSE)
+#cpg coverage
+getCoverageStats(myobj_NEB[[2]],plot=TRUE,both.strands=FALSE)
+
+#descriptive statistics
+getMethylationStats(myobj_NEB[[3]],plot=FALSE,both.strands=FALSE)
+#cpg methylation
+getMethylationStats(myobj_NEB[[3]],plot=TRUE,both.strands=FALSE)
+#cpg coverage
+getCoverageStats(myobj_NEB[[3]],plot=TRUE,both.strands=FALSE)
+
+
+
+
+
+```
+
+
+#Comparative Analysis
+```{r}
+
+#merging samples
+meth_NEB=unite(myobj_NEB, destrand=FALSE)
+write.table(meth_NEB,"~/R/8018_methyl/meth_NEB.txt")
+
+
+
+
+#sample correlation
+getCorrelation(meth_NEB,plot=TRUE)
+
+
+#clustering samples based on methylation profiles
+clusterSamples(meth_NEB, dist="correlation", method="ward", plot=TRUE)
+#hc = clusterSamples(meth_NEB, dist="correlation", method="ward", plot=FALSE)
+PCASamples(meth_NEB)
+
+
+##Finding differentially methylated bases or regions
+myDiff_NEB=calculateDiffMeth(meth_NEB)
+write.table(myDiff_NEB,"~/R/8018_methyl/myDiff_NEB.txt")
+
+#
+# get hyper methylated bases
+myDiff25p.hyper_NEB=getMethylDiff(myDiff_NEB,difference=25,qvalue=0.5,type="hyper")
+write.table(myDiff25p.hyper_NEB,"~/R/8018_methyl/hyper_meth_NEB.txt")
+
+# get hypo methylated bases
+myDiff25p.hypo_NEB=getMethylDiff(myDiff_NEB,difference=25,qvalue=0.5,type="hypo")
+write.table(myDiff25p.hypo_NEB,"~/R/8018_methyl/hypo_meth_NEB.txt")
+
+# get all differentially methylated bases
+myDiff25p_NEB=getMethylDiff(myDiff_NEB,difference=25,qvalue=0.5)
+write.table(myDiff25p_NEB,"~/R/8018_methyl/all_Diff_meth_NEB.txt")
+
+diffMethPerChr(myDiff_NEB,plot=TRUE,qvalue.cutoff=0.5, meth.cutoff=25)
+diffMethPerChr(myDiff_NEB,plot=FALSE,qvalue.cutoff=0.5, meth.cutoff=25)
+
+
+```
+
+
+#Annotating differentially methylated bases or regions
+```{r}
+#if (!require("BiocManager", quietly = TRUE))
+#    install.packages("BiocManager")
+#BiocManager::install("genomation")
+
+library(genomation)
+#regional analysis using bed file
+gene.obj=readTranscriptFeatures("~/R/8018_methyl/hg38_RefSeq.bed")
+
+annotateWithGeneParts(as(myDiff25p_NEB,"GRanges"),gene.obj)
+
+# convert methylDiff object to GRanges and annotate
+diffCpGann_NEB=annotateWithFeatureFlank(as(myDiff25p_NEB,"GRanges"),
+                                    cpg.obj$CpGi,cpg.obj$shores,
+                         feature.name="CpGi",flank.name="shores")
+
+
+cpg.obj_NEB=readFeatureFlank(system.file("cpgi.hg38.bed.txt",
+                                        package = "methylKit"),
+                           feature.flank.name=c("CpGi","shores"))
+
+
+
+
+
+#========================================
+##4
+#Regional Analysis
+promoters_NEB=regionCounts(myobj_NEB,gene.obj$promoters)
+head(promoters_NEB[[3]])
+
+#Convenience functions for annotation objects
+diffAnn_NEB=annotateWithGeneParts(as(myDiff25p_NEB,"GRanges"),gene.obj)
+head(getAssociationWithTSS(diffAnn_NEB))
+getTargetAnnotationStats(diffAnn_NEB,percentage=TRUE,precedence=TRUE) # no overlap except the intergenic
+
+plotTargetAnnotation(diffAnn_NEB,precedence=TRUE,
+    main="differential methylation annotation (NEB)")
+
+
+
+
+```
